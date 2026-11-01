@@ -97,44 +97,44 @@
    "build": {
     "service": "office_char",
     "worker": "Asking635/bomei-blender-worker-4",
-    "attempt": "attempt-3",
+    "attempt": "attempt-13",
     "report_schema": "office-char-build.v1",
     "report_char": "gm",
-    "job_id": "45b1aa38-90c8-4436-9242-f7fb8944c1da",
-    "wall_seconds": 366.4,
-    "worker_revision": "1434905e8749ca5edc90f701573f31397ddb42cd",
-    "worker_sha256": "5d331d107355f77ea5ee533f0bd77a5e2345b7a5b628f1614a8947d4dfc9ff16"
+    "job_id": "69fc3314-37a5-4010-af1c-8c9b2fbe75cc",
+    "wall_seconds": 359.9,
+    "worker_revision": "6e5baab6e516ea2d938fc9a58a64748b62bc7ce1",
+    "worker_sha256": "4c62ed6d0738af29a6f8c054cb31f512b355110279ef4a213ae5ad21e1a9cfbd"
    },
    "artifacts": {
     "game": {
      "file": "gm.glb.gz",
-     "raw_sha256": "f2993bdbdbb6dd494463e3c1f3d497bfb435036c9e684d607609d9c6f5260c4b",
-     "raw_bytes": 12175964,
-     "gz_sha256": "2c9eaf7248cd737c39e8b8e766f05dfa9bbf29f2c38c25695c89c6103d7a4816",
-     "gz_bytes": 3520843
+     "raw_sha256": "b320f634cefb1ae66fb4337d788f9acbf473d6c17141359397bb596cdd93a2c9",
+     "raw_bytes": 12181100,
+     "gz_sha256": "2d94f0fb154677a8652e810503181747fe3bdc4d1fd1c8606a6e3e75618712e8",
+     "gz_bytes": 3799780
     },
     "hq": {
      "file": "gm-hq.glb.gz",
-     "raw_sha256": "5c73da9553d8c1d37b588694fe00817f92c699a4e013df6d47c3e76401a15b18",
-     "raw_bytes": 13385088,
-     "gz_sha256": "333f0f764754abd54a014bf0e75e85cb40ea5d1d18657c8e0ddb8df257b64cd8",
-     "gz_bytes": 3900825
+     "raw_sha256": "21cea1b4d2814ed5e56327adb940127daa0203e4c8d76332a29b379291046564",
+     "raw_bytes": 13418156,
+     "gz_sha256": "c69d5fbe12ba5c014b40230073a719d8ec3ec281eb795580df9481daece7822e",
+     "gz_bytes": 4256145
     }
    },
-   "status": "built; runtime wiring and user visual acceptance pending",
+   "status": "rebuilt attempt-13: fur baked to vertex color, inner-ear red repaired; runtime wiring and user visual acceptance pending",
    "fur": {
     "skinned": true,
     "game": {
      "strands": 7000,
      "triangles": 35000,
      "guard_share": 0.08542857142857142,
-     "mean_length_mm": 9.23
+     "mean_length_mm": 9.18
     },
     "hq": {
      "strands": 9000,
      "triangles": 45000,
      "guard_share": 0.07677777777777778,
-     "mean_length_mm": 9.13
+     "mean_length_mm": 9.07
     }
    }
   }

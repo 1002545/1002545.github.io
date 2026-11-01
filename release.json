@@ -1,9 +1,9 @@
 {
  "version": 62,
  "entry": "/play-v62.html",
- "runtime": "/game/city-all-535b0a662daa.js",
+ "runtime": "/game/city-v3-d5ed3e4ffa35.js",
  "stylesheet": "/game/city-607e6d42a6f1.css",
- "sha256": "535b0a662daa20accb978567f456a2aca0d1951f3475d53b259e7ce5b7a4a0bd",
+ "sha256": "d5ed3e4ffa3523b3abb3cec57a56c8bdbfd4b377fc940d12d8e6275727d06586",
  "stylesheetSha256": "607e6d42a6f131b29ebb8f33fed2249fee8cf6608f09d43fcf753e0fd7a45d5d",
  "scope": [
   "subway-sign-headroom",
@@ -107,7 +107,7 @@
   "r50-all-bags-right-side-hand",
   "r50-authored-beach-lounger-lengthwise-side-lie-and-continuous-approach"
  ],
- "displayVersion": "V6.2 R63 · r55+r79+r81",
+ "displayVersion": "V6.2 R63 · r55+r79+r81 · boot-fix",
  "baseline": "published V6.2 core-r13 4c0653eb",
  "excluded": [
   "new NPC models and size changes",

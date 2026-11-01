@@ -18367,6 +18367,39 @@ globalThis.bomeiCoastalRouteV50={
  * missing-GM warning required by the task.
  */
 var BOMEI_R55_STORY_VERSION = 'r55-story.v1';
+// Boot-time respawn restore: switching to another scene before the first room is
+// interactive forces a second full room preparation inside the boot chain, which
+// never finished on slow phones (the loading UI sat at "preparing destination").
+// Restoring into the SAME room is cheap and still runs during boot; a different
+// scene is deferred until the game reports itself ready.
+var bomeiR55BootDeferredRestore = false;
+// Reading the saved record is synchronous and side-effect free, so the boot chain
+// can decide whether restoring would force a second room preparation. Restoring
+// into the same room is cheap and stays inline; a different scene is deferred.
+function bomeiR55ShouldDeferRestore() {
+  let record = null;
+  try {
+    const storage = bomeiR63Storage();
+    const raw = storage ? storage.getItem(bomeiR63Respawn.key) : null;
+    if (raw) record = JSON.parse(raw);
+  } catch (error) {
+    return false;
+  }
+  if (record && typeof record.scene === 'string' && record.scene !== h.id) {
+    bomeiR55BootDeferredRestore = true;
+    return true;
+  }
+  return false;
+}
+function bomeiR55RunDeferredRestore() {
+  if (!bomeiR55BootDeferredRestore) return;
+  bomeiR55BootDeferredRestore = false;
+  setTimeout(() => {
+    bomeiR63Restore().catch((error) => {
+      console.error('r55 story: deferred respawn restore failed:', error);
+    });
+  }, 900);
+}
 var bomeiR55StoryRuntime = (function () {
   'use strict';
 
@@ -18385,7 +18418,7 @@ var bomeiR55StoryRuntime = (function () {
   const OFFICE = Object.freeze({ halfX: 4.0, z0: -21.0, z1: -15.5 });
   const PANEL = Object.freeze({ x: 0.84, y: 0.92, z: 0.42, w: 0.34, h: 0.9 });
   const BUTTON_15 = Object.freeze({ x: PANEL.x - 0.012, y: 0.64, z: PANEL.z });
-  const DISPLAY = Object.freeze({ x: 0, y: 2.22, z: 0.045, w: 0.8, h: 0.3 });
+  const DISPLAY = Object.freeze({ x: 0, y: 2.22, z: 0.095, w: 0.8, h: 0.3 });
 
   const S = {
     installed: false,
@@ -18402,8 +18435,8 @@ var bomeiR55StoryRuntime = (function () {
     clockOverride: null,
     clockWrapped: false,
     roomUpdates: new WeakSet(),
-    gm: { status: 'uninitialized', warned: false, actor: null, characters: null, clips: null, quality: 'game' },
-    elevator: { circuits: null, span: SPAN, from: FROM_FLOOR, offset: 0, callT: null, elapsed: -1, state: null, pressed: null },
+    gm: { status: 'uninitialized', warned: false, actor: null, characters: null, clips: null, quality: 'game', promise: null },
+    elevator: { circuits: null, span: SPAN, from: FROM_FLOOR, offset: 0, callT: null, elapsed: -1, state: null, pressed: null, holdPress: false },
     door: { progress: 0, pivot: null, leaf: null, project: null, barrier: null, nameplate: null },
     props: { keyboard: null, laptop: null, phone: null, chat: null, taxi: null, cable: null },
     display: { mesh: null, canvas: null, ctx: null, texture: null, text: '' },
@@ -18527,7 +18560,7 @@ var bomeiR55StoryRuntime = (function () {
 
     const wallMat = material('#d9d3c8', 0.82, 0, {});
     const trimMat = material('#8f8a80', 0.48, 0.2, {});
-    const carpetMat = material('#4c4440', 0.94, 0, {});
+    const carpetMat = material('#6a5d55', 0.94, 0, {});
     const steel = material('#aeb4b7', 0.3, 0.62, {});
     const darkSteel = material('#4a4f55', 0.45, 0.5, {});
     const accent = material('#c9a24a', 0.3, 0.55, {});
@@ -18545,12 +18578,12 @@ var bomeiR55StoryRuntime = (function () {
       room.root.add(light);
       return light;
     };
-    addLight(0, 2.28, 1.15, '#f2f6ff', 2.2, 5.0, 'story-cabin');
-    addLight(0, 2.45, -0.80, '#f4f7ff', 2.2, 6.0, 'story-hall');
-    for (const z of [-3.5, -6.5, -9.5, -12.5]) addLight(0, 2.5, z, '#fff2dd', 2.0, 6.0, 'story-corridor');
-    addLight(0.3, 2.35, -15.15, '#ffd9a8', 2.4, 5.0, 'story-gm-door');
-    addLight(0.25, 2.45, -16.40, '#f2f6ff', 2.6, 6.0, 'story-office-door');
-    for (const [x, z] of [[-2.5, -17.0], [2.5, -18.5], [0, -20.0]]) addLight(x, 2.5, z, '#eef4ff', 2.4, 7.0, 'story-office');
+    addLight(0, 2.28, 1.15, '#f2f6ff', 16, 6.0, 'story-cabin');
+    addLight(0, 2.45, -0.80, '#f4f7ff', 18, 7.0, 'story-hall');
+    for (const z of [-3.0, -5.8, -8.6, -11.4, -14.2]) addLight(0, 2.62, z, '#fff2dd', 22, 7.5, 'story-corridor');
+    addLight(0.3, 2.35, -15.15, '#ffd9a8', 26, 6.0, 'story-gm-door');
+    addLight(0.25, 2.45, -16.40, '#f2f6ff', 30, 7.0, 'story-office-door');
+    for (const [x, z] of [[-2.5, -17.0], [2.5, -18.5], [0, -20.0]]) addLight(x, 2.55, z, '#eef4ff', 28, 8.0, 'story-office');
 
     // Cabin: steel shell, doors on z=0, rear door to the 3F landing.
     wallX(room, -CABIN.x, 0, CABIN.back, CABIN.top, 0.1, steel);
@@ -18679,7 +18712,7 @@ var bomeiR55StoryRuntime = (function () {
     room.storyVersion = VERSION;
 
     // GM character interface.  Only a manifest-provided GLB is ever shown.
-    loadGm(room).catch((error) => {
+    S.gm.promise = loadGm(room).catch((error) => {
       S.gm.status = 'error';
       S.gm.error = String(error?.message || error);
       console.error('r55 story: GM character could not be instantiated:', S.gm.error);
@@ -18782,6 +18815,7 @@ var bomeiR55StoryRuntime = (function () {
   }
 
   function pressing(floor) {
+    S.elevator.holdPress = true;
     S.elevator.pressed = String(floor);
     drawPanel(floor);
   }
@@ -18794,7 +18828,7 @@ var bomeiR55StoryRuntime = (function () {
     S.elevator.state = state;
     setCabinDoors(state.doors);
     drawDisplay(state.text);
-    if (state.canBoard === 1 && S.elevator.pressed) clearPressing();
+    if (state.canBoard === 1 && S.elevator.pressed && !S.elevator.holdPress) clearPressing();
   }
 
   function elevatorRest() {
@@ -19179,37 +19213,9 @@ var bomeiR55StoryRuntime = (function () {
     }
     return resolveKey(keys[keys.length - 1], room, dog);
   }
-  // The authored knock camera looks at human eye height (y=1.0) while the real
-  // protagonist is a 0.5 m Pomeranian.  Until a real knock clip/GM is authored,
-  // keep the authored camera position but lower the look point to the dog's
-  // actual head height so the knock is readable.  Documented in README.
+  // Setups own their camera keys; the JSON is the single source of truth.
   function cameraPose(t) {
-    const pose = cameraPoseRaw(t);
-    if (!pose || !S.current) return pose;
-    if (S.current.setup === 'taxi-phone') {
-      const dog = bomeiR48.api?.dog;
-      if (dog) {
-        // Authored camera is at taxi-local (0.12,1.08,-1.12), directly behind
-        // the seated dog, so the phone and paws are hidden by the fur.  Move to
-        // a front three-quarter passenger view.
-        pose.pos.set(dog.position.x + 0.6, dog.position.y + 0.75, dog.position.z + 0.45);
-        pose.look.set(dog.position.x + 0.38, dog.position.y + 0.55, dog.position.z);
-      }
-    }
-    if (S.current.setup === 'knock') {
-      const dog = bomeiR48.api?.dog;
-      if (dog) {
-        // Authored camera: (0.62, 1.12, -14.4) looking at the door.  That sits
-        // directly behind a 0.5 m four-legged protagonist, so the knocking paw
-        // and the door leaf are completely occluded by the dog's back.  Keep
-        // the authored distance but move to a three-quarter, eye-height view.
-        pose.pos.x = Math.min(1.4, dog.position.x + 0.57);
-        pose.pos.y = dog.position.y + 0.92;
-        pose.pos.z = -14.4;
-        pose.look.set(dog.position.x + 0.22, dog.position.y + 0.72, -15.5);
-      }
-    }
-    return pose;
+    return cameraPoseRaw(t);
   }
   function applyCamera(camera, t) {
     const pose = cameraPose(t);
@@ -19253,7 +19259,6 @@ var bomeiR55StoryRuntime = (function () {
     const dog = api.dog;
     dog.position.set(x, dog.position.y, z);
     dog.rotation.set(0, yaw, 0);
-    dog.visible = true;
     return dog;
   }
   function standThenResolve() {
@@ -19354,9 +19359,16 @@ var bomeiR55StoryRuntime = (function () {
       const dogDef = setup.dog;
       if (!dogDef) throw Error(`r55 story: setup ${name} has no dog pose`);
       await standThenResolve();
+      // A setup that stages the GM must not start its timeline before the actor
+      // exists; otherwise the first cue runs into a half-built scene.
+      if (setup.gm && S.gm.promise) {
+        await S.gm.promise;
+        if (S.gm.status !== 'ready' || !S.gm.actor) {
+          throw Error(`r55 story: setup ${name} needs the GM actor but it is ${S.gm.status}: ${S.gm.error || 'not loaded'}`);
+        }
+      }
       const api = dogPlacement();
       const props = ensureProps(room);
-      api.dog.visible = !setup.hideDog;
       props.keyboard.visible = false;
       props.laptop.visible = false;
       props.phone.visible = false;
@@ -19365,6 +19377,7 @@ var bomeiR55StoryRuntime = (function () {
       S.taxiMotion = null;
 
       placeDog(dogDef.pos[0], dogDef.pos[1], dogDef.yaw || 0);
+      api.dog.visible = !setup.hideDog;
       if (dogDef.seat) {
         bomeiR48Run('activity', { type: dogDef.seat, walk: false });
       }
@@ -19409,6 +19422,7 @@ var bomeiR55StoryRuntime = (function () {
           const passenger = setup.taxi.passenger;
           const world = taxi.localToWorld(new H(passenger[0], passenger[1], passenger[2]));
           placeDog(world.x, world.z, taxi.rotation.y + (passenger[3] || 0));
+          api.dog.visible = !setup.hideDog;
           api.dog.position.y = world.y;
           if (S.clips) playClip('sit-in-taxi', { from: 0, delay: 0 });
         }
@@ -19517,6 +19531,7 @@ var bomeiR55StoryRuntime = (function () {
     if (current.setupRef.lid) setLid(lidAtTime(current.setupRef.lid, t));
     if (S.taxiMotion && S.taxiMotion.started !== null) updateTaxi(t);
     gmUpdate(t);
+    suppressGamePanels();
 
     // Timeline events.
     for (let index = 0; index < current.timeline.length; index++) {
@@ -19535,6 +19550,16 @@ var bomeiR55StoryRuntime = (function () {
     if (S.current && S.props.chat && current.setupRef.overlays?.chat) S.props.chat.visible = true;
   }
 
+  // The office "work" activity opens its memo panel over the centre of the
+  // screen, which would cover the laptop and keyboard an authored shot frames.
+  function suppressGamePanels() {
+    if (typeof document === 'undefined') return;
+    for (const id of ['interaction-panel', 'interaction-backdrop']) {
+      const element = document.getElementById(id);
+      if (element && !element.hidden) element.hidden = true;
+    }
+  }
+
   function resetPlayback(current) {
     stopClip();
     gmStop();
@@ -19544,6 +19569,7 @@ var bomeiR55StoryRuntime = (function () {
     S.elevator.callT = null;
     S.elevator.circuits = null;
     S.elevator.pressed = null;
+    S.elevator.holdPress = false;
     drawPanel(null);
     elevatorRest();
     setDoorProgress(current.setupRef.door?.start ?? 0, false);
@@ -20401,4 +20427,4 @@ window.__r81Travel=function(id){return Ee(id)};window.__r81Room=function(){retur
 bomeiR55StoryRuntime.bindBoot({travel:Ee,room:()=>h,stand:_e,activity:()=>x,walk:path=>{const bomeiR55Dog=bomeiR48.api?.dog;if(!bomeiR55Dog)throw Error("r55 story: dog is not ready for walk");D=path.map(point=>new H(point[0],bomeiR55Dog.position.y,point[1]));O=null;k=null}});async function Ee(e){if(!Um[e]||nL)return;if(j){if(!j.r34Cancel?.(`已取消上一次切换。`))return;}if(h.id===`flight`&&!uf.landed(XI)||h.id===`train`&&h.canExit&&!h.canExit(`platform`,XI)){z(h.exitMessage(XI),5);return}e===`flight`&&(e=`airport`),e===`train`&&(e=`platform`);if(E&&!ye())return;Me(),I.close(),ZI.close?.(),D=[],O=null,k=null,A=null;
  const taxiExit=F?.cancelTaxiRideV1?.();F=null;
  if(taxiExit){v.position.fromArray(taxiExit.position),v.rotation.set(0,taxiExit.yaw,0),R.visible=!1,QI.effect(`ride-end`),pe(!0)}
- let t=j={ready:!1,start:M};bomeiR34AttachTransition(t,e,()=>j===t,message=>{if(j===t){j=null;D=[];O=null;WI.style.opacity=`0`;Me();z(message,6)}});z(`正在前往`+Um[e].name+`…`,60);try{!e.startsWith(`home`)&&!Se&&await bomeiR34WaitForTransition(Ce(),t,`正在准备公共资源…`);if(!bomeiR34TransitionCurrent(t))return;await bomeiR34WaitForTransition(p.loadAssets(e),t,`正在准备目的地资源…`);if(!bomeiR34TransitionCurrent(t))return;let targetRoom=await bomeiR34WaitForTransition(bomeiR34PrepareDestination(p,e,g,()=>h.id,t),t,`正在准备目的地画面…`);if(!bomeiR34TransitionCurrent(t))return;let n=targetRoom.zones?.find(t=>t.id===e),r=n?.bounds||targetRoom.nav.bounds,i=(()=>{const ret=(targetRoom.portals||[]).find(p=>p.to===h.id),pair=(h.id===`snackstreet`&&e===`marketstreet`)||(h.id===`marketstreet`&&e===`snackstreet`);if(pair&&ret){const dx=ret.approach[0]-ret.threshold[0],dz=ret.approach[1]-ret.threshold[1],dl=Math.hypot(dx,dz);if(dl>0)return[ret.threshold[0]+dx/dl*2,ret.threshold[1]+dz/dl*2]}return n?[(r[0]+r[1])/2,(r[2]+r[3])/2]:targetRoom.spawn||[0,0]})(),a=[];for(let e=r[0]+.3;e<r[1]-.2;e+=.25)for(let n=r[2]+.3;n<r[3]-.2;n+=.25)Wm([e,n],targetRoom.nav,.48)&&!(targetRoom.portals||[]).some(t=>Math.hypot(e-t.threshold[0],n-t.threshold[1])<1.2)&&a.push([e,n]);a.sort((e,t)=>Math.hypot(e[0]-i[0],e[1]-i[1])-Math.hypot(t[0]-i[0],t[1]-i[1]));let o=n?[]:targetRoom.portals||[],s=a.find(e=>!o.length||o.some(n=>Km(e,n.approach,targetRoom.nav)));if(!s)throw Error(`No safe arrival`);fe(),h.officeDevicesV1?.suspend(),h.video?.pause(),bomeiSeatRoomLeaveV62(h,'player'),_.release(h.scene),h.id===`gym`&&(h.exercising=!1);let c=h.id;c===`flight`&&uf.finish(),h=targetRoom,h.startTravel?.(c,XI),h.scene.add(v,R),v.position.copy(ue(...s)),v.rotation.set(0,0,0),x=null,R.visible=!1,h.scene.updateMatrixWorld(!0),b.setRoom(h,v.position),_g.setRoom(h),_g.verify(),(bomeiR81Mobile.mobile?(bomeiR81Report.counters.postSpawnSkipped++,bomeiR81Idle.touch(),0):(bomeiR50PostSpawnPrecompileV50.begin(h),await bomeiR50PostSpawnPrecompileV50.finish(h,()=>g(h)))),p.trim?.(h.id),y.sceneChanged(),Ld(h,XI),f.setGrade({...eI,...h.grade}),re=e,ZI.setLocation(e),QI.setRoom(h.id),de(),pe(!0),z(Um[e].name,3)}catch(e){if(!bomeiR34TransitionCurrent(t))return;e?.code!==`NAVIGATION_CANCELLED`&&console.error(e),z([`NAVIGATION_WAIT_TIMEOUT`,`ROOM_PREPARATION_BUSY`].includes(e?.code)?e.message:`这个地点暂未准备好，可稍后再试；共享资源可能仍在准备。`,8)}finally{bomeiR34FinishTransition(t);if(j===t){j=null;WI.style.opacity=`0`}}}ZI.setTravelHandler?.(Ee);function De(e,t){if(ZI.open||I.open||j||A||F)return;let n=i.getBoundingClientRect();ae.set((e-n.left)/n.width*2-1,-(t-n.top)/n.height*2+1),ie.setFromCamera(ae,a);let r=e=>{for(let t=e;t;t=t.parent)if(!t.visible)return!1;return e.material?.opacity!==0},o=ie.intersectObjects([...h.picks,...b.visible.map(e=>e.mesh),...w.firstPerson?[]:[v]],!0).filter(e=>r(e.object)||e.object.userData.exit),s=ie.intersectObjects(h.root.children,!0).filter(e=>r(e.object))[0]?.distance??1/0;for(let e of bomeiHomeDoorPickHitsV2(bomeiWallSwitchPickHitsV1(o,ie,h,s),s)){if(e.distance>s+.16)continue;const seatHitV62=e;let t=e.object,n,r;for(;t;){if(t.userData.door){let e=t.userData.door;const sources=[ce,()=>a.position,()=>b.visible.map(p=>({point:p.mesh.getWorldPosition(new H),radius:p.mesh.userData.navRadius??.34,height:p.mesh.userData.height??1.4}))];if(e.toggle(...sources)){D=[],O=null,k=null;QI.effect(e.open?`door-open`:`door-close`);z(e.open?`门正在打开，等门扇停稳后再通行。`:`门正在关好。`,3)}else if(e.exterior){const action=bomeiHomeDoorActionV2(h,e,sources,stand=>ge(ce(),stand),open=>QI.effect(open?`door-open`:`door-close`));if(action){ve(action.stand,{activity:action});if(k===action||k?.type===action.type)z(`先退开一点，再开关门。`,3)}else z(`门扇旁还有人或镜头，请让出位置再试。`,3)}else z(`离门远一点，再开关门。`,2);return}if(t.userData.fareGateLaneV62){const gate=t.userData.fareGateLaneV62,paidSide=ce().z<=gate.z;if(!paidSide&&!uf.hasRail(XI)){const ticket=h.activities.find(e=>e.type===`rail-ticket`);ticket?(z(`先在售票机激活今日交通卡，$3.00。`,4),ve(ticket.stand,{activity:ticket})):z(`请先在售票机激活今日交通卡。`,4)}else ve([gate.x,gate.z+(paidSide?1:-.85)]);return}if(t.userData.bicycle){let e=t.userData.bicycle;if(E===e){ye();return}if(E&&!ye())return;let r=bomeiBikeMountCandidatesV62(h,e,ce(),b.visible).find(e=>ge(ce(),e));r?ve(r,{activity:{type:`mount-bike`,bike:e,stand:r}}):z(`自行车旁没有可停靠的位置。`);return}if(t.userData.playBall){let e=h.playBall.approach(ce());e&&ve(e,{activity:{type:`kick-ball`,stand:e}});return}if(t.userData.npcId){let e=b.visible.find(e=>e.id===t.userData.npcId);if(e)if(ce().distanceTo(e.mesh.getWorldPosition(new H))<1.5)I.npc(e,h,XI),QI.effect(`greet`);else{let t=[];for(let n=0;n<16;n++){let r=n*Math.PI/8,i=[e.position[0]+Math.cos(r)*.95,e.position[1]+Math.sin(r)*.95];Wm(i,h.nav)&&ge(ce(),i)&&t.push(i)}t.sort((e,t)=>Math.hypot(ce().x-e[0],ce().z-e[1])-Math.hypot(ce().x-t[0],ce().z-t[1])),t.length?(e.path=[],e.wait=20,e.intent=`greet`,ve(t[0],{activity:{type:`greet-neighbor`,stand:t[0],instant:!0,message:`走近邻居，打个招呼。`,onActivate(){e.scene===h.id&&ce().distanceTo(e.mesh.getWorldPosition(new H))<1.5?I.npc(e,h,XI):z(`邻居已经走远了，请再靠近一些。`)}}})):z(`先走到邻居附近，再打招呼。`)}return}if(t===v){_.look(M),QI.effect(`pet`);return}n||=t.userData.exit,r||=t.userData.activity,t=t.parent}if(r&&!n)bomeiRetailSelectHitV1(h,h.activities.find(a=>a.type===r),e);if(n){let e=h.portals.find(e=>e.to===n);ve(e.approach,{exit:e});return}if(r){const pickedSeatV62=bomeiSeatPickV62(h,seatHitV62.object,seatHitV62.point,v);let e=pickedSeatV62.handled?pickedSeatV62.activity:bomeiDynamicPlantActivityForHitV1(h,seatHitV62.object)||h.activities.find(e=>e.type===r);if(!e){z(`这里暂时有人坐着，请选旁边的位置。`,2);return}if(e===x||e.seatIdV62&&e.seatIdV62===x?.seatIdV62){e.dialogue&&I.show(bomeiRetailConsumeDialogueV1(e,()=>_g.decorate(e,h.id)),{shopId:h.id,activityType:e.type}),_.look(M);return}ve(e.stand,{activity:e});return}}let c=h.walkSurfaces?ie.intersectObjects(h.walkSurfaces,!0)[0]?.point:ie.ray.intersectPlane(L,oe);if(c&&oe.copy(c),c&&oe.distanceTo(a.position)<180){let e=oe.clone();if(s+.1<a.position.distanceTo(e))return;let t=h.portals.find(t=>Math.hypot(e.x-t.approach[0],e.z-t.approach[1])<(h.outdoor?1.5:.7));t?ve(t.approach,{exit:t}):ve([e.x,e.z])}}let Oe=Hm(a,o,C,ce),ke=e=>(...t)=>(T.manual(ce(),M),e(...t));document.getElementById(`view-center`).onclick=()=>{ZI.open||I.open||j||(Me(),w.firstPerson?(w.resetHeading(),w.update(C)):(Oe.recenter(),T.manual(ce(),M)),i.focus?.())};let Ae=new Bm(i,{mouse:!0,blocked:()=>ZI.open||I.open||nL,firstPerson:()=>w.firstPerson,onStart:()=>{je.active&&Ae.cancelTap(),QI.unlock?.(),de()},onTap:(e,t)=>{je.active||De(e,t)},onOrbit:ke(Oe.orbit),onPair:ke(Oe.pair),onLook:(e,t,n,r)=>w.look(e*.48,-t*.34,r)}),je=new Vm(document.getElementById(`move-joystick`),{thumb:document.getElementById(`move-joystick-thumb`),blocked:()=>!tL||ZI.open||I.open||nL||j||F||document.hidden,onStart:()=>{Ae.cancelTap(),D=[],O=null,k=null,R.visible=!1,QI.unlock?.(),de(),T.manual(ce(),M)},onStop:()=>{D=[],O=null,k=null}});function Me(){Ae.reset(),je.reset(),w.keys.clear(),me.open=!1,T.manual(ce(),M)}if(window.addEventListener(`blur`,Me),window.addEventListener(`pageshow`,()=>{Me(),n.reset(),e?.wake()}),window.addEventListener(`pagehide`,()=>{h.officeDevicesV1?.suspend(),e?.stop(),h.video?.pause(),Me(),YI.save(),b.save(),bomeiR63Save('pagehide')}),document.addEventListener(`visibilitychange`,()=>{n.reset(),e?.wake(),document.hidden&&h.officeDevicesV1?.suspend(),document.hidden?(bomeiR63Save('hidden'),Me(),h.video?.pause()):de()}),window.addEventListener(`resize`,Me),i.addEventListener(`dblclick`,e=>e.preventDefault()),window.addEventListener(`keydown`,e=>{let t=e.key.toLowerCase();if(!(e.target?.closest?.(`input,textarea,select,[contenteditable="true"],[role="textbox"]`)||e.altKey||e.ctrlKey||e.metaKey)){if(t===`escape`&&me.open){me.open=!1,document.getElementById(`view-menu-toggle`).focus?.();return}if([`w`,`a`,`s`,`d`,`arrowup`,`arrowdown`,`arrowleft`,`arrowright`].includes(t)){if(!tL||ZI.open||I.open||nL||j||F)return;e.preventDefault(),w.keys.size||(D=[],O=null,k=null,R.visible=!1,QI.unlock?.(),de()),w.keys.add(t);return}I.open||(t===`m`&&!e.repeat&&document.getElementById(`map-toggle`).click(),t===`v`&&!e.repeat&&he(),e.key===`Home`&&!w.firstPerson&&(S.delete(h.id),pe()))}}),window.addEventListener(`keyup`,e=>w.keys.delete(e.key.toLowerCase())),window.addEventListener(`resize`,()=>{a.aspect=innerWidth/innerHeight,a.updateProjectionMatrix(),r.setSize(innerWidth,innerHeight),f.resize(),e?.wake()}),nL||(oL(`绘制房间`),await g(h),nL)||(Ld(h,XI),h.scene.updateMatrixWorld(!0),(bomeiApplyRoomLightsV1(h),f.render(h.scene,a,0)),nL))return;await bomeiR63Restore();if(nL)return;aL(100),HI.classList.add(`complete`),setTimeout(()=>HI.classList.add(`hidden`),180),tL=!0,z(`点击地面行走；电脑也可用方向键或 WASD。`,4),document.body.dataset.ready=`true`,document.body.dataset.room=`home`;function Ne(){if(nL||bomeiR50PostSpawnPrecompileV50.pending)return;let e=performance.now();if(document.hidden||ZI.open){bomeiFacialPreview.pause("hidden-or-map");n.reset(),h.video?.pause(),ZI.open&&!document.hidden&&(XI=YI.sample(),XI.label!==ee&&(ee=XI.label,ZI.setTime?.(XI)));return}n.idleR47=n.mobile&&bomeiR47Idle(e,D.length>0||!!A||!!F||!!j||!!E||w.keys.size>0||x?.type===`exercise`||I.open||document.hidden);let t=n.step(e,{dialog:I.open});if(t===null)return;bomeiFacialPreview.beginFrame();bomeiR47Adapt(e,n,f.renderer,f);if(XI=YI.sample(),XI.label!==ee&&(ee=XI.label,ZI.setTime?.(XI)),I.open){if(A?.treadmillActivityV1)A.start+=t;M+=t,b.animateConversation(t,ce(),I.npcSession?.person?.id),Ld(h,XI),_.update(M,t,{moving:!1,camera:a,room:h,activityTime:M-N}),_g.update(),_.physicalFootSupportV1.apply(h,bomeiPhysicalFootStandingPhaseV1(x,A,F,E,j),_g),_.treadmillSupportV1.apply(h,x,A,_g,M),_.escalatorFootSupportV1.apply(h,F,_g,_.physicalFootSupportV1.state),h.update?.(M,{cityTime:XI,player:ce(),camera:a.position}),h.cullZones?.(a.position,ce()),bomeiUpdateOfficeDevicesV1(h,a,M),m.update(h,a,M,XI),bomeiApplyRoomLightsV1(h),p.updateHarbour(h,a,M,XI),(bomeiFacialPreview.flush(h.scene),f.render(h.scene,a,M));return}if(Ae.update(),M+=t,h.id===`platform`&&!j&&!A&&!F){let e=bm(XI.total),t=v.position;if(e.left<=.55&&e.left>0&&t.x>4.36&&t.x<5.78&&Math.abs(t.z)<5.7)if(D=[],O=null,k=null,uf.hasRail(XI)){let e=h.portals.find(e=>e.to===`train`);e&&Te(e)}else t.set(3.25,le(3.25,0),0),z(`请先激活今日交通卡，再上车。`,4)}Ld(h,XI);bomeiVehicleSyncV62(h,E);let r=!1,i=ce();bomeiSeatReconcilePlayerV62(h,k,A,x);b.update(XI,t,i);let s=b.visible;for(let e of s){let t=e.mesh.position.distanceTo(a.position);e.mesh.userData.camDist=t;for(let n of e.mesh.userData.coats||[]){if(n.userData?.petRigFurV1===true)bomeiPetRigFurDistanceR25(n,t);else if(n.userData?.furShellR45){}else{n.visible=t<7;n.geometry.setDrawRange(0,t<2.5?1/0:Math.floor(n.geometry.attributes.position.count/9)*3)}}}let c=null,g=6.25,gNativeHW=6.25,gErrorHW=0;for(let e of s){e.mesh.getWorldPosition(l);const nearestHW=bomeiHW.nearestCandidate(l.x,l.y,l.z,i.x,i.y,i.z,g,gNativeHW,gErrorHW);nearestHW.accepted&&(g=nearestHW.distance,gNativeHW=nearestHW.nativeDistance,gErrorHW=nearestHW.error,c=e.mesh)}h.aiCompanion=c?c.getWorldPosition(u):null,y.update(h,XI,x?.type||(D.length?`walking`:`idle`),s,e=>{h.aiMood=e.mood,h.aiGaze=e.gaze,h.aiPace=e.pace,b.applyDecisions(e)}),j?.ready&&(!j.switched&&!j.bodyTrainRejectedV62&&M-j.start>.32&&(j.switched=!0,Te(j.exit)!==!1?bomeiR34FinishTransition(j):(j.switched=!1)),M-j.start>.42&&(WI.style.opacity=`0`),M-j.start>.78&&(bomeiR34FinishTransition(j),j=null));let S=je.movement(a)||w.movement();if(F){let e=F.sample(XI);const vehicleTransferV1=F.transferRequest?.();if(vehicleTransferV1)bomeiR27TransferHotelRideV1(F,vehicleTransferV1);v.position.fromArray(e.position),v.rotation.set(0,e.yaw,0),e.done&&(F=null,QI.effect(`ride-end`),z(e.message||`已到达，可以继续步行。`,e.failed?8:e.message?3:2))}else if(A){let e=Math.min(1,(M-A.start)/A.duration),t=bomeiHW.smoothstep(e);if(A.treadmillActivityV1)v.position.copy(bomeiTreadmillMotionPointV1(A,e));else if(A.seatMotionV62)v.position.copy(bomeiSeatMotionPointV62(A.from,A.to,e,A.seatLiftV62??.11));else{v.position.fromArray(bomeiHW.smoothLerp3(A.from.x,A.from.y,A.from.z,A.to.x,A.to.y,A.to.z,e));v.position.y+=Math.sin(e*Math.PI)*.11}A.seatProgressV62=e;A.seatApplyV62?.(e);let n=A.to.clone().sub(A.from);if(A.treadmillActivityV1?v.rotation.y=bomeiTreadmillMotionYawV1(A,e):A.seatMotionV62?v.rotation.y=bomeiSeatMotionYawV62(A.seatFromYawV62,A.seatYawV62,e):Math.hypot(n.x,n.z)>.01&&(v.rotation.y=Math.atan2(n.x,n.z)),r=!0,e===1){let e=A.onEnd;A=null,e()}}else if(S&&!j)if(x)D=[],O=null,k=null,_e(()=>{});else{let e=ce(),n=E?b.slidePlayer(e,e.clone().addScaledVector(S,VI*t),bomeiVehicleNavV62(h,E)):bomeiBodyStepV62(e,e.clone().addScaledVector(S,BI*t),bomeiBodyRoomNavV62(h),b.visible,v.rotation.y,t);if(n&&(n.distanceToSquared(e)>1e-10||!E&&Math.abs(n.bodyYawV62-v.rotation.y)>1e-8)){v.position.copy(n),v.position.y=le(n.x,n.z)+(E?.82:Math.abs(Math.sin(M*16.6))*.004);let i=n.clone().sub(e),a=Math.atan2(i.x,i.z),o=Math.atan2(Math.sin(a-v.rotation.y),Math.cos(a-v.rotation.y));v.rotation.y=E?v.rotation.y+o*Math.min(1,t*12):n.bodyYawV62,r=!0}let i=h.portals.find(t=>Math.hypot(e.x-t.approach[0],e.z-t.approach[1])<1.2&&S.dot(new H(t.threshold[0]-e.x,0,t.threshold[1]-e.z).normalize())/S.length()>Math.cos(75*Math.PI/180));i&&Qm(i.to,XI)&&(!h.canExit||h.canExit(i.to,XI))&&(w.keys.clear(),je.reset(),ve(i.approach,{exit:i}))}else if(D.length&&(!j||j.switched)){let e=D[0],n=e.clone().sub(v.position);n.y=0;let i=n.length(),a=E?VI:BI*(h.aiPace===`gentle`?.9:h.aiPace===`brisk`&&h.outdoor?1.08:1),o=Math.min(i,t*a);if(i>.001){let e=E?b.slidePlayer(v.position,v.position.clone().addScaledVector(n,o/i),bomeiVehicleNavV62(h,E)):bomeiHomeDoorDepartureStepV91(v.position,v.position.clone().addScaledVector(n,o/i),bomeiBodyRoomNavV62(h),b.visible,v.rotation.y,t,Math.atan2(n.x,n.z),O,D[0],h.id);if(e){v.position.copy(e),v.position.y=le(v.position.x,v.position.z)+(E?.82:Math.abs(Math.sin(M*16.6))*.004);let i=Math.atan2(n.x,n.z),a=Math.atan2(Math.sin(i-v.rotation.y),Math.cos(i-v.rotation.y));v.rotation.y=E?v.rotation.y+a*Math.min(1,t*12):e.bodyYawV62,r=!0}}if(i<.025&&(E?bomeiBikeStepClearV62(h,E,v.position,e,b.visible):bomeiBodyTransferClearV62(v.position,e,v.rotation.y,bomeiBodyRoomNavV62(h),b.visible))&&(v.position.set(e.x,le(e.x,e.z)+(E?.82:0),e.z),D.shift(),!D.length)){if(O&&!h.queueExit?.(O.to))we(O);else if(k){let e=k;k=null,be(e)}}if(!E&&bomeiBodyTrainHandoffV62(h,O,D,v.position,v.rotation.y,b.visible,XI))we(O)}if(D.length&&!j&&!A&&!F&&M-te>1.25){if(ce().distanceTo(ne)<.12){let e=O?O.approach:[D.at(-1).x,D.at(-1).z],t=ge(ce(),e);t&&(D=t.map(e=>ue(e[0],e[1])),O&&!h.queueExit?.(O.to)&&D.push(ue(...O.threshold)))}te=M,ne.copy(ce())}O&&h.queueExit?.(O.to)&&!D.length&&!j&&!A&&(h.readyToBoard?.(XI)??h.canExit(O.to,XI))&&(h.id===`platform`&&O.to===`train`?we(O,!0):Math.hypot(v.position.x-O.threshold[0],v.position.z-O.threshold[1])<.04?we(O):D=[ue(O.threshold[0],O.threshold[1])]),E&&(E.position.set(v.position.x,le(v.position.x,v.position.z),v.position.z),E.rotation.y=v.rotation.y-Math.PI/2,E.traverse(e=>{e.userData.bikeWheel&&(e.rotation.z-=r?t*VI/.27:0)})),QI.update(M,{moving:r,activity:x?.type,speed:r?ce().distanceTo(i)/Math.max(t,.001):0,riding:!!E,zone:h.connectedHome?h.zoneAt(v.position.x,v.position.z):void 0,player:{x:v.position.x,z:v.position.z},cityTime:XI,gate:h.fareGate});let ie=_.update(M,t,{moving:r&&!E&&!A?.seatMotionV62&&!A?.treadmillActivityV1&&!x?.seatIdV62,riding:!!E,speed:r&&!E&&!A?.seatMotionV62&&!A?.treadmillActivityV1&&!x?.seatIdV62?ce().distanceTo(i)/Math.max(t,.001):0,camera:a,room:h,activityTime:M-N});_g.update();_.physicalFootSupportV1.apply(h,bomeiPhysicalFootStandingPhaseV1(x,A,F,E,j),_g),_.treadmillSupportV1.apply(h,x,A,_g,M);_.escalatorFootSupportV1.apply(h,F,_g,_.physicalFootSupportV1.state);let ae=h.update?.(M,{ringing:ie?.ringing,cityTime:XI,player:ce(),camera:a.position});if(h.connectedHome){let e=h.zoneAt(v.position.x,v.position.z);e!==re&&(re=e,ZI.setLocation(e)),bomeiSetFrameDatasetV63(document.body,`homeZone`,e)}if(h.metro?.state&&h.metro.lastSoundPhase!==h.metro.state.phase){let e=h.metro.state.phase;e===`arriving`&&QI.effect(`train-arrive`),(e===`opening`||e===`closing`)&&QI.effect(`train-door`),h.metro.lastSoundPhase=e}if(h.travel?.arrived&&!h.travel.announced&&(h.travel.announced=!0,z(`已到达${Um[h.travel.destination].name}，请沿出口下车。`,4),QI.effect(`train-brake`),QI.effect(`door`)),ae&&f.setGrade({...eI,...h.grade,...ae}),bomeiSeatApplyFreeViewV62(a,o,h,x,A,M,seatViewFrameV62,w.firstPerson),w.firstPerson?(w.update(C),F?.applyCameraV1?.(a)):(o.update(),T.update(ce(),h,t,M,Ae.points.size>0||!!j)),R.visible){let markerHW=bomeiHW.motionMarker(M-se),e=markerHW[2];R.material.opacity=markerHW[0],R.scale.setScalar(markerHW[1]),R.visible=e>0}M>P&&GI.classList.remove(`show`),M-d>.25&&(d=M,de()),h.cullZones?.(a.position,ce()),bomeiUpdateOfficeDevicesV1(h,a,M),m.update(h,a,M,XI),bomeiApplyRoomLightsV1(h),p.updateHarbour(h,a,M,XI),(bomeiFacialPreview.flush(h.scene),f.render(h.scene,a,M)),bomeiSetFrameDatasetV63(document.body,`room`,h.id),bomeiSetFrameDatasetV63(document.body,`cityTime`,XI.label),bomeiSetFrameDatasetV63(document.body,`cityDay`,String(XI.day)),bomeiSetFrameDatasetV63(document.body,`motion`,F?`riding`:A?`step`:D.length?`walking`:x?.type||`idle`);bomeiR63Tick()}e=new sf(Ne,{hidden:()=>document.hidden||nL,covered:()=>ZI.open,deadline:()=>n.next,paced:()=>n.mobile,onError:error=>bomeiRuntimeFrameFailureR36(error,h,Me)}),e.wake()}
+ let t=j={ready:!1,start:M};bomeiR34AttachTransition(t,e,()=>j===t,message=>{if(j===t){j=null;D=[];O=null;WI.style.opacity=`0`;Me();z(message,6)}});z(`正在前往`+Um[e].name+`…`,60);try{!e.startsWith(`home`)&&!Se&&await bomeiR34WaitForTransition(Ce(),t,`正在准备公共资源…`);if(!bomeiR34TransitionCurrent(t))return;await bomeiR34WaitForTransition(p.loadAssets(e),t,`正在准备目的地资源…`);if(!bomeiR34TransitionCurrent(t))return;let targetRoom=await bomeiR34WaitForTransition(bomeiR34PrepareDestination(p,e,g,()=>h.id,t),t,`正在准备目的地画面…`);if(!bomeiR34TransitionCurrent(t))return;let n=targetRoom.zones?.find(t=>t.id===e),r=n?.bounds||targetRoom.nav.bounds,i=(()=>{const ret=(targetRoom.portals||[]).find(p=>p.to===h.id),pair=(h.id===`snackstreet`&&e===`marketstreet`)||(h.id===`marketstreet`&&e===`snackstreet`);if(pair&&ret){const dx=ret.approach[0]-ret.threshold[0],dz=ret.approach[1]-ret.threshold[1],dl=Math.hypot(dx,dz);if(dl>0)return[ret.threshold[0]+dx/dl*2,ret.threshold[1]+dz/dl*2]}return n?[(r[0]+r[1])/2,(r[2]+r[3])/2]:targetRoom.spawn||[0,0]})(),a=[];for(let e=r[0]+.3;e<r[1]-.2;e+=.25)for(let n=r[2]+.3;n<r[3]-.2;n+=.25)Wm([e,n],targetRoom.nav,.48)&&!(targetRoom.portals||[]).some(t=>Math.hypot(e-t.threshold[0],n-t.threshold[1])<1.2)&&a.push([e,n]);a.sort((e,t)=>Math.hypot(e[0]-i[0],e[1]-i[1])-Math.hypot(t[0]-i[0],t[1]-i[1]));let o=n?[]:targetRoom.portals||[],s=a.find(e=>!o.length||o.some(n=>Km(e,n.approach,targetRoom.nav)));if(!s)throw Error(`No safe arrival`);fe(),h.officeDevicesV1?.suspend(),h.video?.pause(),bomeiSeatRoomLeaveV62(h,'player'),_.release(h.scene),h.id===`gym`&&(h.exercising=!1);let c=h.id;c===`flight`&&uf.finish(),h=targetRoom,h.startTravel?.(c,XI),h.scene.add(v,R),v.position.copy(ue(...s)),v.rotation.set(0,0,0),x=null,R.visible=!1,h.scene.updateMatrixWorld(!0),b.setRoom(h,v.position),_g.setRoom(h),_g.verify(),(bomeiR81Mobile.mobile?(bomeiR81Report.counters.postSpawnSkipped++,bomeiR81Idle.touch(),0):(bomeiR50PostSpawnPrecompileV50.begin(h),await bomeiR50PostSpawnPrecompileV50.finish(h,()=>g(h)))),p.trim?.(h.id),y.sceneChanged(),Ld(h,XI),f.setGrade({...eI,...h.grade}),re=e,ZI.setLocation(e),QI.setRoom(h.id),de(),pe(!0),z(Um[e].name,3)}catch(e){if(!bomeiR34TransitionCurrent(t))return;e?.code!==`NAVIGATION_CANCELLED`&&console.error(e),z([`NAVIGATION_WAIT_TIMEOUT`,`ROOM_PREPARATION_BUSY`].includes(e?.code)?e.message:`这个地点暂未准备好，可稍后再试；共享资源可能仍在准备。`,8)}finally{bomeiR34FinishTransition(t);if(j===t){j=null;WI.style.opacity=`0`}}}ZI.setTravelHandler?.(Ee);function De(e,t){if(ZI.open||I.open||j||A||F)return;let n=i.getBoundingClientRect();ae.set((e-n.left)/n.width*2-1,-(t-n.top)/n.height*2+1),ie.setFromCamera(ae,a);let r=e=>{for(let t=e;t;t=t.parent)if(!t.visible)return!1;return e.material?.opacity!==0},o=ie.intersectObjects([...h.picks,...b.visible.map(e=>e.mesh),...w.firstPerson?[]:[v]],!0).filter(e=>r(e.object)||e.object.userData.exit),s=ie.intersectObjects(h.root.children,!0).filter(e=>r(e.object))[0]?.distance??1/0;for(let e of bomeiHomeDoorPickHitsV2(bomeiWallSwitchPickHitsV1(o,ie,h,s),s)){if(e.distance>s+.16)continue;const seatHitV62=e;let t=e.object,n,r;for(;t;){if(t.userData.door){let e=t.userData.door;const sources=[ce,()=>a.position,()=>b.visible.map(p=>({point:p.mesh.getWorldPosition(new H),radius:p.mesh.userData.navRadius??.34,height:p.mesh.userData.height??1.4}))];if(e.toggle(...sources)){D=[],O=null,k=null;QI.effect(e.open?`door-open`:`door-close`);z(e.open?`门正在打开，等门扇停稳后再通行。`:`门正在关好。`,3)}else if(e.exterior){const action=bomeiHomeDoorActionV2(h,e,sources,stand=>ge(ce(),stand),open=>QI.effect(open?`door-open`:`door-close`));if(action){ve(action.stand,{activity:action});if(k===action||k?.type===action.type)z(`先退开一点，再开关门。`,3)}else z(`门扇旁还有人或镜头，请让出位置再试。`,3)}else z(`离门远一点，再开关门。`,2);return}if(t.userData.fareGateLaneV62){const gate=t.userData.fareGateLaneV62,paidSide=ce().z<=gate.z;if(!paidSide&&!uf.hasRail(XI)){const ticket=h.activities.find(e=>e.type===`rail-ticket`);ticket?(z(`先在售票机激活今日交通卡，$3.00。`,4),ve(ticket.stand,{activity:ticket})):z(`请先在售票机激活今日交通卡。`,4)}else ve([gate.x,gate.z+(paidSide?1:-.85)]);return}if(t.userData.bicycle){let e=t.userData.bicycle;if(E===e){ye();return}if(E&&!ye())return;let r=bomeiBikeMountCandidatesV62(h,e,ce(),b.visible).find(e=>ge(ce(),e));r?ve(r,{activity:{type:`mount-bike`,bike:e,stand:r}}):z(`自行车旁没有可停靠的位置。`);return}if(t.userData.playBall){let e=h.playBall.approach(ce());e&&ve(e,{activity:{type:`kick-ball`,stand:e}});return}if(t.userData.npcId){let e=b.visible.find(e=>e.id===t.userData.npcId);if(e)if(ce().distanceTo(e.mesh.getWorldPosition(new H))<1.5)I.npc(e,h,XI),QI.effect(`greet`);else{let t=[];for(let n=0;n<16;n++){let r=n*Math.PI/8,i=[e.position[0]+Math.cos(r)*.95,e.position[1]+Math.sin(r)*.95];Wm(i,h.nav)&&ge(ce(),i)&&t.push(i)}t.sort((e,t)=>Math.hypot(ce().x-e[0],ce().z-e[1])-Math.hypot(ce().x-t[0],ce().z-t[1])),t.length?(e.path=[],e.wait=20,e.intent=`greet`,ve(t[0],{activity:{type:`greet-neighbor`,stand:t[0],instant:!0,message:`走近邻居，打个招呼。`,onActivate(){e.scene===h.id&&ce().distanceTo(e.mesh.getWorldPosition(new H))<1.5?I.npc(e,h,XI):z(`邻居已经走远了，请再靠近一些。`)}}})):z(`先走到邻居附近，再打招呼。`)}return}if(t===v){_.look(M),QI.effect(`pet`);return}n||=t.userData.exit,r||=t.userData.activity,t=t.parent}if(r&&!n)bomeiRetailSelectHitV1(h,h.activities.find(a=>a.type===r),e);if(n){let e=h.portals.find(e=>e.to===n);ve(e.approach,{exit:e});return}if(r){const pickedSeatV62=bomeiSeatPickV62(h,seatHitV62.object,seatHitV62.point,v);let e=pickedSeatV62.handled?pickedSeatV62.activity:bomeiDynamicPlantActivityForHitV1(h,seatHitV62.object)||h.activities.find(e=>e.type===r);if(!e){z(`这里暂时有人坐着，请选旁边的位置。`,2);return}if(e===x||e.seatIdV62&&e.seatIdV62===x?.seatIdV62){e.dialogue&&I.show(bomeiRetailConsumeDialogueV1(e,()=>_g.decorate(e,h.id)),{shopId:h.id,activityType:e.type}),_.look(M);return}ve(e.stand,{activity:e});return}}let c=h.walkSurfaces?ie.intersectObjects(h.walkSurfaces,!0)[0]?.point:ie.ray.intersectPlane(L,oe);if(c&&oe.copy(c),c&&oe.distanceTo(a.position)<180){let e=oe.clone();if(s+.1<a.position.distanceTo(e))return;let t=h.portals.find(t=>Math.hypot(e.x-t.approach[0],e.z-t.approach[1])<(h.outdoor?1.5:.7));t?ve(t.approach,{exit:t}):ve([e.x,e.z])}}let Oe=Hm(a,o,C,ce),ke=e=>(...t)=>(T.manual(ce(),M),e(...t));document.getElementById(`view-center`).onclick=()=>{ZI.open||I.open||j||(Me(),w.firstPerson?(w.resetHeading(),w.update(C)):(Oe.recenter(),T.manual(ce(),M)),i.focus?.())};let Ae=new Bm(i,{mouse:!0,blocked:()=>ZI.open||I.open||nL,firstPerson:()=>w.firstPerson,onStart:()=>{je.active&&Ae.cancelTap(),QI.unlock?.(),de()},onTap:(e,t)=>{je.active||De(e,t)},onOrbit:ke(Oe.orbit),onPair:ke(Oe.pair),onLook:(e,t,n,r)=>w.look(e*.48,-t*.34,r)}),je=new Vm(document.getElementById(`move-joystick`),{thumb:document.getElementById(`move-joystick-thumb`),blocked:()=>!tL||ZI.open||I.open||nL||j||F||document.hidden,onStart:()=>{Ae.cancelTap(),D=[],O=null,k=null,R.visible=!1,QI.unlock?.(),de(),T.manual(ce(),M)},onStop:()=>{D=[],O=null,k=null}});function Me(){Ae.reset(),je.reset(),w.keys.clear(),me.open=!1,T.manual(ce(),M)}if(window.addEventListener(`blur`,Me),window.addEventListener(`pageshow`,()=>{Me(),n.reset(),e?.wake()}),window.addEventListener(`pagehide`,()=>{h.officeDevicesV1?.suspend(),e?.stop(),h.video?.pause(),Me(),YI.save(),b.save(),bomeiR63Save('pagehide')}),document.addEventListener(`visibilitychange`,()=>{n.reset(),e?.wake(),document.hidden&&h.officeDevicesV1?.suspend(),document.hidden?(bomeiR63Save('hidden'),Me(),h.video?.pause()):de()}),window.addEventListener(`resize`,Me),i.addEventListener(`dblclick`,e=>e.preventDefault()),window.addEventListener(`keydown`,e=>{let t=e.key.toLowerCase();if(!(e.target?.closest?.(`input,textarea,select,[contenteditable="true"],[role="textbox"]`)||e.altKey||e.ctrlKey||e.metaKey)){if(t===`escape`&&me.open){me.open=!1,document.getElementById(`view-menu-toggle`).focus?.();return}if([`w`,`a`,`s`,`d`,`arrowup`,`arrowdown`,`arrowleft`,`arrowright`].includes(t)){if(!tL||ZI.open||I.open||nL||j||F)return;e.preventDefault(),w.keys.size||(D=[],O=null,k=null,R.visible=!1,QI.unlock?.(),de()),w.keys.add(t);return}I.open||(t===`m`&&!e.repeat&&document.getElementById(`map-toggle`).click(),t===`v`&&!e.repeat&&he(),e.key===`Home`&&!w.firstPerson&&(S.delete(h.id),pe()))}}),window.addEventListener(`keyup`,e=>w.keys.delete(e.key.toLowerCase())),window.addEventListener(`resize`,()=>{a.aspect=innerWidth/innerHeight,a.updateProjectionMatrix(),r.setSize(innerWidth,innerHeight),f.resize(),e?.wake()}),nL||(oL(`绘制房间`),await g(h),nL)||(Ld(h,XI),h.scene.updateMatrixWorld(!0),(bomeiApplyRoomLightsV1(h),f.render(h.scene,a,0)),nL))return;if(!bomeiR55ShouldDeferRestore())await bomeiR63Restore();if(nL)return;aL(100),HI.classList.add(`complete`),setTimeout(()=>HI.classList.add(`hidden`),180),tL=!0,z(`点击地面行走；电脑也可用方向键或 WASD。`,4),document.body.dataset.ready=`true`,bomeiR55RunDeferredRestore(),document.body.dataset.room=`home`;function Ne(){if(nL||bomeiR50PostSpawnPrecompileV50.pending)return;let e=performance.now();if(document.hidden||ZI.open){bomeiFacialPreview.pause("hidden-or-map");n.reset(),h.video?.pause(),ZI.open&&!document.hidden&&(XI=YI.sample(),XI.label!==ee&&(ee=XI.label,ZI.setTime?.(XI)));return}n.idleR47=n.mobile&&bomeiR47Idle(e,D.length>0||!!A||!!F||!!j||!!E||w.keys.size>0||x?.type===`exercise`||I.open||document.hidden);let t=n.step(e,{dialog:I.open});if(t===null)return;bomeiFacialPreview.beginFrame();bomeiR47Adapt(e,n,f.renderer,f);if(XI=YI.sample(),XI.label!==ee&&(ee=XI.label,ZI.setTime?.(XI)),I.open){if(A?.treadmillActivityV1)A.start+=t;M+=t,b.animateConversation(t,ce(),I.npcSession?.person?.id),Ld(h,XI),_.update(M,t,{moving:!1,camera:a,room:h,activityTime:M-N}),_g.update(),_.physicalFootSupportV1.apply(h,bomeiPhysicalFootStandingPhaseV1(x,A,F,E,j),_g),_.treadmillSupportV1.apply(h,x,A,_g,M),_.escalatorFootSupportV1.apply(h,F,_g,_.physicalFootSupportV1.state),h.update?.(M,{cityTime:XI,player:ce(),camera:a.position}),h.cullZones?.(a.position,ce()),bomeiUpdateOfficeDevicesV1(h,a,M),m.update(h,a,M,XI),bomeiApplyRoomLightsV1(h),p.updateHarbour(h,a,M,XI),(bomeiFacialPreview.flush(h.scene),f.render(h.scene,a,M));return}if(Ae.update(),M+=t,h.id===`platform`&&!j&&!A&&!F){let e=bm(XI.total),t=v.position;if(e.left<=.55&&e.left>0&&t.x>4.36&&t.x<5.78&&Math.abs(t.z)<5.7)if(D=[],O=null,k=null,uf.hasRail(XI)){let e=h.portals.find(e=>e.to===`train`);e&&Te(e)}else t.set(3.25,le(3.25,0),0),z(`请先激活今日交通卡，再上车。`,4)}Ld(h,XI);bomeiVehicleSyncV62(h,E);let r=!1,i=ce();bomeiSeatReconcilePlayerV62(h,k,A,x);b.update(XI,t,i);let s=b.visible;for(let e of s){let t=e.mesh.position.distanceTo(a.position);e.mesh.userData.camDist=t;for(let n of e.mesh.userData.coats||[]){if(n.userData?.petRigFurV1===true)bomeiPetRigFurDistanceR25(n,t);else if(n.userData?.furShellR45){}else{n.visible=t<7;n.geometry.setDrawRange(0,t<2.5?1/0:Math.floor(n.geometry.attributes.position.count/9)*3)}}}let c=null,g=6.25,gNativeHW=6.25,gErrorHW=0;for(let e of s){e.mesh.getWorldPosition(l);const nearestHW=bomeiHW.nearestCandidate(l.x,l.y,l.z,i.x,i.y,i.z,g,gNativeHW,gErrorHW);nearestHW.accepted&&(g=nearestHW.distance,gNativeHW=nearestHW.nativeDistance,gErrorHW=nearestHW.error,c=e.mesh)}h.aiCompanion=c?c.getWorldPosition(u):null,y.update(h,XI,x?.type||(D.length?`walking`:`idle`),s,e=>{h.aiMood=e.mood,h.aiGaze=e.gaze,h.aiPace=e.pace,b.applyDecisions(e)}),j?.ready&&(!j.switched&&!j.bodyTrainRejectedV62&&M-j.start>.32&&(j.switched=!0,Te(j.exit)!==!1?bomeiR34FinishTransition(j):(j.switched=!1)),M-j.start>.42&&(WI.style.opacity=`0`),M-j.start>.78&&(bomeiR34FinishTransition(j),j=null));let S=je.movement(a)||w.movement();if(F){let e=F.sample(XI);const vehicleTransferV1=F.transferRequest?.();if(vehicleTransferV1)bomeiR27TransferHotelRideV1(F,vehicleTransferV1);v.position.fromArray(e.position),v.rotation.set(0,e.yaw,0),e.done&&(F=null,QI.effect(`ride-end`),z(e.message||`已到达，可以继续步行。`,e.failed?8:e.message?3:2))}else if(A){let e=Math.min(1,(M-A.start)/A.duration),t=bomeiHW.smoothstep(e);if(A.treadmillActivityV1)v.position.copy(bomeiTreadmillMotionPointV1(A,e));else if(A.seatMotionV62)v.position.copy(bomeiSeatMotionPointV62(A.from,A.to,e,A.seatLiftV62??.11));else{v.position.fromArray(bomeiHW.smoothLerp3(A.from.x,A.from.y,A.from.z,A.to.x,A.to.y,A.to.z,e));v.position.y+=Math.sin(e*Math.PI)*.11}A.seatProgressV62=e;A.seatApplyV62?.(e);let n=A.to.clone().sub(A.from);if(A.treadmillActivityV1?v.rotation.y=bomeiTreadmillMotionYawV1(A,e):A.seatMotionV62?v.rotation.y=bomeiSeatMotionYawV62(A.seatFromYawV62,A.seatYawV62,e):Math.hypot(n.x,n.z)>.01&&(v.rotation.y=Math.atan2(n.x,n.z)),r=!0,e===1){let e=A.onEnd;A=null,e()}}else if(S&&!j)if(x)D=[],O=null,k=null,_e(()=>{});else{let e=ce(),n=E?b.slidePlayer(e,e.clone().addScaledVector(S,VI*t),bomeiVehicleNavV62(h,E)):bomeiBodyStepV62(e,e.clone().addScaledVector(S,BI*t),bomeiBodyRoomNavV62(h),b.visible,v.rotation.y,t);if(n&&(n.distanceToSquared(e)>1e-10||!E&&Math.abs(n.bodyYawV62-v.rotation.y)>1e-8)){v.position.copy(n),v.position.y=le(n.x,n.z)+(E?.82:Math.abs(Math.sin(M*16.6))*.004);let i=n.clone().sub(e),a=Math.atan2(i.x,i.z),o=Math.atan2(Math.sin(a-v.rotation.y),Math.cos(a-v.rotation.y));v.rotation.y=E?v.rotation.y+o*Math.min(1,t*12):n.bodyYawV62,r=!0}let i=h.portals.find(t=>Math.hypot(e.x-t.approach[0],e.z-t.approach[1])<1.2&&S.dot(new H(t.threshold[0]-e.x,0,t.threshold[1]-e.z).normalize())/S.length()>Math.cos(75*Math.PI/180));i&&Qm(i.to,XI)&&(!h.canExit||h.canExit(i.to,XI))&&(w.keys.clear(),je.reset(),ve(i.approach,{exit:i}))}else if(D.length&&(!j||j.switched)){let e=D[0],n=e.clone().sub(v.position);n.y=0;let i=n.length(),a=E?VI:BI*(h.aiPace===`gentle`?.9:h.aiPace===`brisk`&&h.outdoor?1.08:1),o=Math.min(i,t*a);if(i>.001){let e=E?b.slidePlayer(v.position,v.position.clone().addScaledVector(n,o/i),bomeiVehicleNavV62(h,E)):bomeiHomeDoorDepartureStepV91(v.position,v.position.clone().addScaledVector(n,o/i),bomeiBodyRoomNavV62(h),b.visible,v.rotation.y,t,Math.atan2(n.x,n.z),O,D[0],h.id);if(e){v.position.copy(e),v.position.y=le(v.position.x,v.position.z)+(E?.82:Math.abs(Math.sin(M*16.6))*.004);let i=Math.atan2(n.x,n.z),a=Math.atan2(Math.sin(i-v.rotation.y),Math.cos(i-v.rotation.y));v.rotation.y=E?v.rotation.y+a*Math.min(1,t*12):e.bodyYawV62,r=!0}}if(i<.025&&(E?bomeiBikeStepClearV62(h,E,v.position,e,b.visible):bomeiBodyTransferClearV62(v.position,e,v.rotation.y,bomeiBodyRoomNavV62(h),b.visible))&&(v.position.set(e.x,le(e.x,e.z)+(E?.82:0),e.z),D.shift(),!D.length)){if(O&&!h.queueExit?.(O.to))we(O);else if(k){let e=k;k=null,be(e)}}if(!E&&bomeiBodyTrainHandoffV62(h,O,D,v.position,v.rotation.y,b.visible,XI))we(O)}if(D.length&&!j&&!A&&!F&&M-te>1.25){if(ce().distanceTo(ne)<.12){let e=O?O.approach:[D.at(-1).x,D.at(-1).z],t=ge(ce(),e);t&&(D=t.map(e=>ue(e[0],e[1])),O&&!h.queueExit?.(O.to)&&D.push(ue(...O.threshold)))}te=M,ne.copy(ce())}O&&h.queueExit?.(O.to)&&!D.length&&!j&&!A&&(h.readyToBoard?.(XI)??h.canExit(O.to,XI))&&(h.id===`platform`&&O.to===`train`?we(O,!0):Math.hypot(v.position.x-O.threshold[0],v.position.z-O.threshold[1])<.04?we(O):D=[ue(O.threshold[0],O.threshold[1])]),E&&(E.position.set(v.position.x,le(v.position.x,v.position.z),v.position.z),E.rotation.y=v.rotation.y-Math.PI/2,E.traverse(e=>{e.userData.bikeWheel&&(e.rotation.z-=r?t*VI/.27:0)})),QI.update(M,{moving:r,activity:x?.type,speed:r?ce().distanceTo(i)/Math.max(t,.001):0,riding:!!E,zone:h.connectedHome?h.zoneAt(v.position.x,v.position.z):void 0,player:{x:v.position.x,z:v.position.z},cityTime:XI,gate:h.fareGate});let ie=_.update(M,t,{moving:r&&!E&&!A?.seatMotionV62&&!A?.treadmillActivityV1&&!x?.seatIdV62,riding:!!E,speed:r&&!E&&!A?.seatMotionV62&&!A?.treadmillActivityV1&&!x?.seatIdV62?ce().distanceTo(i)/Math.max(t,.001):0,camera:a,room:h,activityTime:M-N});_g.update();_.physicalFootSupportV1.apply(h,bomeiPhysicalFootStandingPhaseV1(x,A,F,E,j),_g),_.treadmillSupportV1.apply(h,x,A,_g,M);_.escalatorFootSupportV1.apply(h,F,_g,_.physicalFootSupportV1.state);let ae=h.update?.(M,{ringing:ie?.ringing,cityTime:XI,player:ce(),camera:a.position});if(h.connectedHome){let e=h.zoneAt(v.position.x,v.position.z);e!==re&&(re=e,ZI.setLocation(e)),bomeiSetFrameDatasetV63(document.body,`homeZone`,e)}if(h.metro?.state&&h.metro.lastSoundPhase!==h.metro.state.phase){let e=h.metro.state.phase;e===`arriving`&&QI.effect(`train-arrive`),(e===`opening`||e===`closing`)&&QI.effect(`train-door`),h.metro.lastSoundPhase=e}if(h.travel?.arrived&&!h.travel.announced&&(h.travel.announced=!0,z(`已到达${Um[h.travel.destination].name}，请沿出口下车。`,4),QI.effect(`train-brake`),QI.effect(`door`)),ae&&f.setGrade({...eI,...h.grade,...ae}),bomeiSeatApplyFreeViewV62(a,o,h,x,A,M,seatViewFrameV62,w.firstPerson),w.firstPerson?(w.update(C),F?.applyCameraV1?.(a)):(o.update(),T.update(ce(),h,t,M,Ae.points.size>0||!!j)),R.visible){let markerHW=bomeiHW.motionMarker(M-se),e=markerHW[2];R.material.opacity=markerHW[0],R.scale.setScalar(markerHW[1]),R.visible=e>0}M>P&&GI.classList.remove(`show`),M-d>.25&&(d=M,de()),h.cullZones?.(a.position,ce()),bomeiUpdateOfficeDevicesV1(h,a,M),m.update(h,a,M,XI),bomeiApplyRoomLightsV1(h),p.updateHarbour(h,a,M,XI),(bomeiFacialPreview.flush(h.scene),f.render(h.scene,a,M)),bomeiSetFrameDatasetV63(document.body,`room`,h.id),bomeiSetFrameDatasetV63(document.body,`cityTime`,XI.label),bomeiSetFrameDatasetV63(document.body,`cityDay`,String(XI.day)),bomeiSetFrameDatasetV63(document.body,`motion`,F?`riding`:A?`step`:D.length?`walking`:x?.type||`idle`);bomeiR63Tick()}e=new sf(Ne,{hidden:()=>document.hidden||nL,covered:()=>ZI.open,deadline:()=>n.next,paced:()=>n.mobile,onError:error=>bomeiRuntimeFrameFailureR36(error,h,Me)}),e.wake()}
