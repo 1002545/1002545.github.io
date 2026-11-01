@@ -1,7 +1,144 @@
 {
  "schema": "office-npcs-manifest.v1",
  "status": "INCOMPLETE: office character GLBs not built yet (Blender stage on the worker Spaces not deployed: permission denied in this session). Do not wire characters until characters[] is filled.",
- "characters": [],
+ "characters": [
+  {
+   "id": "gm",
+   "cn": "总经理",
+   "kind": "cat (British Shorthair, blue-grey, charcoal waistcoat + burgundy tie, no tail)",
+   "files": {
+    "game": "gm.glb.gz",
+    "hq": "gm-hq.glb.gz"
+   },
+   "height_m": 0.84,
+   "anchor": {
+    "height_m": 0.84,
+    "ground": "feet at y=0",
+    "front_axis": "-Y"
+   },
+   "clips": [
+    "angry_stand",
+    "door_open",
+    "head_peek",
+    "hit_stagger",
+    "idle",
+    "type_seated",
+    "walk"
+   ],
+   "clip_timing": {
+    "idle": {
+     "seconds": 3.0,
+     "loop": true
+    },
+    "walk": {
+     "seconds": 1.0,
+     "loop": true
+    },
+    "type_seated": {
+     "seconds": 2.0,
+     "loop": true
+    },
+    "door_open": {
+     "seconds": 2.2,
+     "loop": false
+    },
+    "head_peek": {
+     "seconds": 2.5,
+     "loop": false
+    },
+    "hit_stagger": {
+     "seconds": 1.8,
+     "loop": false
+    },
+    "angry_stand": {
+     "seconds": 2.0,
+     "loop": true
+    }
+   },
+   "shape_keys": {
+    "body": [
+     "JawOpen",
+     "Smile",
+     "Frown",
+     "MouthO",
+     "EyeWide_L",
+     "Blink_L",
+     "EyeHappy_L",
+     "Angry_L",
+     "Dazed_L",
+     "EyeWide_R",
+     "Blink_R",
+     "EyeHappy_R",
+     "Angry_R",
+     "Dazed_R"
+    ],
+    "tongue": [
+     "JawOpen"
+    ],
+    "fur": [
+     "JawOpen",
+     "Smile",
+     "Frown",
+     "MouthO",
+     "EyeWide_L",
+     "Blink_L",
+     "EyeHappy_L",
+     "Angry_L",
+     "Dazed_L",
+     "EyeWide_R",
+     "Blink_R",
+     "EyeHappy_R",
+     "Angry_R",
+     "Dazed_R"
+    ]
+   },
+   "no_tails": true,
+   "reference": "source-assets/office-characters/refs/gm/front-r2/reference.webp",
+   "build": {
+    "service": "office_char",
+    "worker": "Asking635/bomei-blender-worker-4",
+    "attempt": "attempt-3",
+    "report_schema": "office-char-build.v1",
+    "report_char": "gm",
+    "job_id": "45b1aa38-90c8-4436-9242-f7fb8944c1da",
+    "wall_seconds": 366.4,
+    "worker_revision": "1434905e8749ca5edc90f701573f31397ddb42cd",
+    "worker_sha256": "5d331d107355f77ea5ee533f0bd77a5e2345b7a5b628f1614a8947d4dfc9ff16"
+   },
+   "artifacts": {
+    "game": {
+     "file": "gm.glb.gz",
+     "raw_sha256": "f2993bdbdbb6dd494463e3c1f3d497bfb435036c9e684d607609d9c6f5260c4b",
+     "raw_bytes": 12175964,
+     "gz_sha256": "2c9eaf7248cd737c39e8b8e766f05dfa9bbf29f2c38c25695c89c6103d7a4816",
+     "gz_bytes": 3520843
+    },
+    "hq": {
+     "file": "gm-hq.glb.gz",
+     "raw_sha256": "5c73da9553d8c1d37b588694fe00817f92c699a4e013df6d47c3e76401a15b18",
+     "raw_bytes": 13385088,
+     "gz_sha256": "333f0f764754abd54a014bf0e75e85cb40ea5d1d18657c8e0ddb8df257b64cd8",
+     "gz_bytes": 3900825
+    }
+   },
+   "status": "built; runtime wiring and user visual acceptance pending",
+   "fur": {
+    "skinned": true,
+    "game": {
+     "strands": 7000,
+     "triangles": 35000,
+     "guard_share": 0.08542857142857142,
+     "mean_length_mm": 9.23
+    },
+    "hq": {
+     "strands": 9000,
+     "triangles": 45000,
+     "guard_share": 0.07677777777777778,
+     "mean_length_mm": 9.13
+    }
+   }
+  }
+ ],
  "pending_characters": [
   {
    "id": "gm",
