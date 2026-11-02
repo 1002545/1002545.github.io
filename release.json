@@ -1,9 +1,9 @@
 {
   "version": 62,
   "entry": "/play-v62.html",
-  "runtime": "/game/city-v4-1f50e69e302e.js",
+  "runtime": "/game/city-v4-5c673bc48751.js",
   "stylesheet": "/game/city-607e6d42a6f1.css",
-  "sha256": "1f50e69e302e95b79b624b0dea4ae196032adb18fff245c25122c455b669ab02",
+  "sha256": "5c673bc48751550fd4981bc85efaae2dcb023eeb3881309a5d059ce8dae8f262",
   "stylesheetSha256": "607e6d42a6f131b29ebb8f33fed2249fee8cf6608f09d43fcf753e0fd7a45d5d",
   "scope": [
     "subway-sign-headroom",
@@ -107,7 +107,7 @@
     "r50-all-bags-right-side-hand",
     "r50-authored-beach-lounger-lengthwise-side-lie-and-continuous-approach"
   ],
-  "displayVersion": "V6.2 R63 · r55+r79+r81 · boot-fix",
+  "displayVersion": "V6.2 R63",
   "baseline": "published V6.2 core-r13 4c0653eb",
   "excluded": [
     "new NPC models and size changes",
@@ -127,7 +127,7 @@
     "new character assets and expanded scene assets",
     "new ceiling-light circuits outside the existing seven"
   ],
-  "revision": "core-r63+r55+r79+r81",
+  "revision": "core-r63",
   "assetRevisions": {
     "amber": {
       "id": "amber",
@@ -633,22 +633,12 @@
     "revision": "core-r48.4"
   },
   "previousRuntime": {
-    "runtime": "/game/city-final-gm6.js",
-    "sha256": "0b149150879e0fe6d7232b6d87bf773629d682e78ab5a31fe6dbf7927747f740"
+    "runtime": "/game/city-566a9bbc2966.js",
+    "sha256": "566a9bbc296677808b5b38baccdbb438c2322924aaf34bcf409b30b050c7726f"
   },
   "layers": [
     "r52-handwired-v7",
     "r53-perf",
-    "r63-respawn-wallet",
-    "r55-story",
-    "r79-snackstreet",
-    "r81-mobile-perf"
-  ],
-  "storyLayer": {
-    "version": "r55-story.v1",
-    "room": "office-15f-r55",
-    "shots": "/story-r55/xiaozhou-shots.json",
-    "anchors": 4,
-    "gm": "assets/npcs/office/gm.glb.gz"
-  }
+    "r63-respawn-wallet"
+  ]
 }
